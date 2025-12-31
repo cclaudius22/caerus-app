@@ -1,0 +1,43 @@
+# Node
+node_modules/
+.expo/
+dist/
+.expo-shared/
+
+# Python
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+
+# Environment
+.env
+*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build
+*.log
+npm-debug.log*
+
+# Firebase
+**/firebase-service-account.json
+firebase-debug.log
+
+# Expo
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+web-build/
