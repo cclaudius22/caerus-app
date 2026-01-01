@@ -7,7 +7,7 @@ from jose import jwt
 
 from app.database import get_db
 from app.config import settings
-from app.models.user import User, FounderProfile, InvestorProfile
+from app.models.user import User, FounderProfile, InvestorProfile, TalentProfile
 from app.api.deps import get_current_user
 from app.services.firebase import verify_firebase_token
 
@@ -17,7 +17,7 @@ router = APIRouter()
 # Request/Response Schemas
 class SignupRequest(BaseModel):
     firebase_token: str
-    role: str  # 'founder' or 'investor'
+    role: str  # 'founder', 'investor', or 'talent'
     email: EmailStr
 
 
@@ -73,6 +73,22 @@ class FounderOnboardingRequest(BaseModel):
     value_add_preferences: Optional[list[str]] = None  # network, operational, hands_off, domain_expertise
 
 
+class TalentOnboardingRequest(BaseModel):
+    full_name: str
+    job_title_seeking: str
+    skills: list[str]
+    experience_level: str  # junior, mid, senior, lead, executive
+    compensation_type: str  # equity_only, pay_equity, cash_only
+    salary_range_min: Optional[int] = None
+    salary_range_max: Optional[int] = None
+    availability: str  # immediate, 2_weeks, 1_month, 3_months
+    location: Optional[str] = None
+    remote_preference: str  # remote_only, hybrid, onsite, flexible
+    linkedin_url: Optional[str] = None
+    github_url: Optional[str] = None
+    portfolio_url: Optional[str] = None
+
+
 def create_access_token(user_id: str) -> str:
     """Create JWT access token."""
     expire = datetime.utcnow() + timedelta(hours=settings.JWT_EXPIRATION_HOURS)
@@ -103,10 +119,10 @@ async def signup(request: SignupRequest, db: Session = Depends(get_db)):
         )
 
     # Validate role
-    if request.role not in ["founder", "investor"]:
+    if request.role not in ["founder", "investor", "talent"]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Role must be 'founder' or 'investor'"
+            detail="Role must be 'founder', 'investor', or 'talent'"
         )
 
     # Create user
@@ -123,8 +139,11 @@ async def signup(request: SignupRequest, db: Session = Depends(get_db)):
     if request.role == "founder":
         profile = FounderProfile(user_id=user.id)
         db.add(profile)
-    else:
+    elif request.role == "investor":
         profile = InvestorProfile(user_id=user.id)
+        db.add(profile)
+    else:  # talent
+        profile = TalentProfile(user_id=user.id, status="pending")
         db.add(profile)
 
     db.commit()
@@ -197,7 +216,7 @@ async def get_me(current_user: User = Depends(get_current_user), db: Session = D
                 "desired_check_size_max": founder_profile.desired_check_size_max,
                 "value_add_preferences": founder_profile.value_add_preferences,
             }
-    else:
+    elif current_user.role == "investor":
         investor_profile = db.query(InvestorProfile).filter(
             InvestorProfile.user_id == current_user.id
         ).first()
@@ -217,6 +236,32 @@ async def get_me(current_user: User = Depends(get_current_user), db: Session = D
                 "geographies": investor_profile.geographies,
                 "free_views_remaining": investor_profile.free_views_remaining,
                 "is_verified": investor_profile.is_verified,
+            }
+    else:  # talent
+        talent_profile = db.query(TalentProfile).filter(
+            TalentProfile.user_id == current_user.id
+        ).first()
+        if talent_profile:
+            onboarding_completed = talent_profile.onboarding_completed or False
+            profile = {
+                "full_name": talent_profile.full_name,
+                "status": talent_profile.status,  # pending, approved, rejected
+                "applied_at": talent_profile.applied_at,
+                "approved_at": talent_profile.approved_at,
+                "rejection_reason": talent_profile.rejection_reason,
+                "onboarding_completed": onboarding_completed,
+                "job_title_seeking": talent_profile.job_title_seeking,
+                "skills": talent_profile.skills,
+                "experience_level": talent_profile.experience_level,
+                "compensation_type": talent_profile.compensation_type,
+                "salary_range_min": talent_profile.salary_range_min,
+                "salary_range_max": talent_profile.salary_range_max,
+                "availability": talent_profile.availability,
+                "location": talent_profile.location,
+                "remote_preference": talent_profile.remote_preference,
+                "linkedin_url": talent_profile.linkedin_url,
+                "github_url": talent_profile.github_url,
+                "portfolio_url": talent_profile.portfolio_url,
             }
 
     return {
@@ -355,6 +400,66 @@ async def complete_founder_onboarding(
             "desired_check_size_min": profile.desired_check_size_min,
             "desired_check_size_max": profile.desired_check_size_max,
             "value_add_preferences": profile.value_add_preferences,
+            "onboarding_completed": profile.onboarding_completed
+        }
+    }
+
+
+@router.post("/onboarding/talent")
+async def complete_talent_onboarding(
+    request: TalentOnboardingRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Complete talent onboarding with profile info. Status remains 'pending' until approved."""
+    if current_user.role != "talent":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only talent can complete talent onboarding"
+        )
+
+    profile = db.query(TalentProfile).filter(
+        TalentProfile.user_id == current_user.id
+    ).first()
+
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Talent profile not found"
+        )
+
+    # Update profile info
+    profile.full_name = request.full_name
+    profile.job_title_seeking = request.job_title_seeking
+    profile.skills = request.skills
+    profile.experience_level = request.experience_level
+    profile.compensation_type = request.compensation_type
+    profile.salary_range_min = request.salary_range_min
+    profile.salary_range_max = request.salary_range_max
+    profile.availability = request.availability
+    profile.location = request.location
+    profile.remote_preference = request.remote_preference
+    profile.linkedin_url = request.linkedin_url
+    profile.github_url = request.github_url
+    profile.portfolio_url = request.portfolio_url
+    profile.onboarding_completed = True
+    # Note: status stays "pending" until admin approves
+
+    db.commit()
+    db.refresh(profile)
+
+    return {
+        "message": "Onboarding completed. Your profile is pending approval.",
+        "profile": {
+            "full_name": profile.full_name,
+            "status": profile.status,
+            "job_title_seeking": profile.job_title_seeking,
+            "skills": profile.skills,
+            "experience_level": profile.experience_level,
+            "compensation_type": profile.compensation_type,
+            "availability": profile.availability,
+            "location": profile.location,
+            "remote_preference": profile.remote_preference,
             "onboarding_completed": profile.onboarding_completed
         }
     }

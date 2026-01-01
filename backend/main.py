@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.api import auth, startups, pitches, qa, subscriptions, question_templates
+from app.api import auth, startups, pitches, qa, subscriptions, question_templates, admin, talent_pitches, talent_qa
 
 app = FastAPI(
     title="Caerus API",
@@ -26,6 +26,9 @@ app.include_router(pitches.router, prefix="/api/v1/pitches", tags=["Pitches"])
 app.include_router(qa.router, prefix="/api/v1/qa", tags=["Q&A"])
 app.include_router(subscriptions.router, prefix="/api/v1", tags=["Subscriptions"])
 app.include_router(question_templates.router, prefix="/api/v1/questions", tags=["Question Templates"])
+app.include_router(admin.router, prefix="/api/v1/admin", tags=["Admin"])
+app.include_router(talent_pitches.router, prefix="/api/v1/talent-pitches", tags=["Talent Pitches"])
+app.include_router(talent_qa.router, prefix="/api/v1/talent-qa", tags=["Talent Q&A"])
 
 
 @app.get("/")

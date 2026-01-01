@@ -13,15 +13,16 @@ Caerus is "Tinder for Founders & Investors" - a mobile-first video pitch marketp
 ## What's Next? 🎯
 
 **Immediate priorities:**
-1. **Test mobile app with backend** - Connect Expo app to localhost:8000 API
-2. **End-to-end video flow** - Record → Upload to GCS → Play in feed
-3. **Real Firebase Auth** - Test signup/login with actual Firebase tokens
+1. **Mobile Talent Screens** - TalentDashboard, TalentOnboarding, RecordTalentPitch
+2. **Feed Toggle (Startups | Talent)** - Add toggle for investors/founders
+3. **Test mobile app with backend** - Connect Expo app to localhost:8000 API
+4. **End-to-end video flow** - Record → Upload to GCS → Play in feed
 
 **Then:**
-4. Complete IAP integration (StoreKit)
-5. Polish UI/UX (loading states, error handling)
-6. Deploy backend to production (Cloud Run or Railway)
-7. TestFlight beta
+5. Complete IAP integration (StoreKit)
+6. Polish UI/UX (loading states, error handling)
+7. Deploy backend to production (Cloud Run or Railway)
+8. TestFlight beta
 
 ---
 
@@ -199,9 +200,62 @@ Caerus is "Tinder for Founders & Investors" - a mobile-first video pitch marketp
 
 ---
 
-## Phase 8: Payments (StoreKit IAP) 🔲 TODO
+## Phase 8: Talent Feature (Job Seekers) ✅ COMPLETE
 
-### 8.1 Backend - IAP Verification
+### 8.1 Backend - Talent Models ✅
+- [x] TalentProfile model (with approval status, compensation preferences)
+- [x] TalentPitch model (30-second video pitches)
+- [x] TalentPitchView model (view tracking)
+- [x] TalentQAThread model (recruiter-talent messaging)
+- [x] TalentQAMessage model
+- [x] Added talent_views_today fields to FounderProfile and InvestorProfile
+
+### 8.2 Backend - Talent APIs ✅
+- [x] POST /auth/signup with role="talent"
+- [x] POST /auth/onboarding/talent endpoint
+- [x] GET /auth/me returns talent profile with approval status
+- [x] GET /talent-pitches/feed (for founders/investors, 5/day limit)
+- [x] GET /talent-pitches/{id} (pitch detail with video URL)
+- [x] POST /talent-pitches/upload-url (approved talent only)
+- [x] POST /talent-pitches/{id}/publish
+- [x] POST /talent-pitches/{id}/view (with daily view decrement)
+- [x] GET /talent-pitches/my-pitch (talent's own pitch)
+- [x] GET /talent-pitches/dashboard (talent stats)
+- [x] POST /talent-qa/threads (create thread)
+- [x] GET /talent-qa/threads (list threads)
+- [x] POST/GET /talent-qa/threads/{id}/messages
+
+### 8.3 Backend - Admin Approval ✅
+- [x] GET /admin/talent/pending (list pending applications)
+- [x] POST /admin/talent/{id}/approve
+- [x] POST /admin/talent/{id}/reject
+- [x] GET /admin/talent/stats
+
+### 8.4 Quality Control ✅
+- [x] Invite-only / Waitlist model (status: pending → approved)
+- [x] Compensation types: equity_only, pay_equity, cash_only
+- [x] Only approved talent can upload pitches
+- [x] Only approved talent with published pitches appear in feed
+
+### 8.5 Freemium for Talent Feed ✅
+- [x] 5 talent views per day (daily reset at midnight)
+- [x] Investors with subscription get unlimited views
+- [x] Founders limited to 5/day (no subscription yet)
+
+### 8.6 Mobile - Talent Screens 🔲 TODO
+- [ ] TalentDashboardScreen.tsx
+- [ ] TalentOnboardingScreen.tsx
+- [ ] RecordTalentPitchScreen.tsx
+- [ ] TalentQAScreen.tsx
+- [ ] TalentSwipeFeedScreen.tsx (for founders/investors)
+- [ ] Feed toggle (Startups | Talent)
+- [ ] RoleSelectScreen update for "I'm Talent" option
+
+---
+
+## Phase 9: Payments (StoreKit IAP) 🔲 TODO
+
+### 9.1 Backend - IAP Verification
 - [x] Subscription model
 - [x] PitchUnlock model
 - [x] POST /iap/verify-subscription endpoint (stub)
@@ -268,7 +322,7 @@ Caerus is "Tinder for Founders & Investors" - a mobile-first video pitch marketp
 
 ## Files Created
 
-### Backend (28 files)
+### Backend (32 files)
 ```
 backend/
 ├── main.py
@@ -284,23 +338,28 @@ backend/
     ├── database.py
     ├── models/
     │   ├── __init__.py
-    │   ├── user.py
+    │   ├── user.py (includes TalentProfile)
     │   ├── startup.py
     │   ├── pitch.py
     │   ├── qa.py
     │   ├── subscription.py
-    │   └── question_template.py
+    │   ├── question_template.py
+    │   ├── talent_pitch.py (NEW)
+    │   └── talent_qa.py (NEW)
     ├── schemas/
     │   └── __init__.py
     ├── api/
     │   ├── __init__.py
-    │   ├── deps.py
-    │   ├── auth.py
+    │   ├── deps.py (includes talent dependencies)
+    │   ├── auth.py (includes talent signup/onboarding)
     │   ├── startups.py
     │   ├── pitches.py
     │   ├── qa.py
     │   ├── subscriptions.py
-    │   └── question_templates.py
+    │   ├── question_templates.py
+    │   ├── admin.py (NEW - talent approval)
+    │   ├── talent_pitches.py (NEW)
+    │   └── talent_qa.py (NEW)
     ├── services/
     │   ├── __init__.py
     │   ├── firebase.py
