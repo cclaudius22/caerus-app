@@ -14,6 +14,7 @@ class User(Base):
     firebase_uid = Column(String(128), unique=True, nullable=False, index=True)
     email = Column(String(255), unique=True, nullable=False)
     role = Column(String(20), nullable=False)  # 'founder', 'investor', or 'talent'
+    avatar_url = Column(String(500), nullable=True)  # Profile photo URL
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -29,8 +30,14 @@ class FounderProfile(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), unique=True)
+
+    # Profile info
     full_name = Column(String(255))
+    company_name = Column(String(255))
     linkedin_url = Column(String(500))
+    twitter_url = Column(String(500))
+    website = Column(String(500))
+    profile_completed = Column(Boolean, default=False)
 
     # Onboarding preferences
     onboarding_completed = Column(Boolean, default=False)
@@ -55,10 +62,14 @@ class InvestorProfile(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), unique=True)
+
+    # Profile info
     full_name = Column(String(255))
     firm_name = Column(String(255))
     linkedin_url = Column(String(500))
+    twitter_url = Column(String(500))
     website = Column(String(500))
+    profile_completed = Column(Boolean, default=False)
 
     # Onboarding preferences
     onboarding_completed = Column(Boolean, default=False)
@@ -115,14 +126,20 @@ class TalentProfile(Base):
     portfolio_url = Column(String(500))
     certifications = Column(ARRAY(String))
     linkedin_url = Column(String(500))
+    twitter_url = Column(String(500))
     github_url = Column(String(500))
+    website = Column(String(500))
 
     # Location
     location = Column(String(255))
     remote_preference = Column(String(20))  # remote_only, hybrid, onsite, flexible
 
-    # Onboarding
+    # Sector preferences (sectors they want to work in)
+    preferred_sectors = Column(ARRAY(String))  # SaaS, Fintech, HealthTech, etc.
+
+    # Onboarding & Profile
     onboarding_completed = Column(Boolean, default=False)
+    profile_completed = Column(Boolean, default=False)
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

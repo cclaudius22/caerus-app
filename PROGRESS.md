@@ -1,6 +1,6 @@
 # Caerus Development Progress
 
-**Last Updated:** December 31, 2024 (Evening)
+**Last Updated:** January 7, 2026
 
 ---
 
@@ -12,17 +12,29 @@ Caerus is "Tinder for Founders & Investors" - a mobile-first video pitch marketp
 
 ## What's Next? 🎯
 
-**Immediate priorities:**
-1. **Mobile Talent Screens** - TalentDashboard, TalentOnboarding, RecordTalentPitch
-2. **Feed Toggle (Startups | Talent)** - Add toggle for investors/founders
-3. **Test mobile app with backend** - Connect Expo app to localhost:8000 API
-4. **End-to-end video flow** - Record → Upload to GCS → Play in feed
+### Immediate TODO:
+1. **Test Video Uploads** - End-to-end video flow: Record → Upload to GCS → Play in feed
+2. **Deploy Admin Panel** - Push admin/ to Vercel
+3. **Deploy Backend** - Choose hosting (see options below)
+4. **TestFlight Setup** - iOS beta testing
 
-**Then:**
+### Backend Hosting Options:
+
+| Option | Pros | Cons | Cost |
+|--------|------|------|------|
+| **Railway** | Easy deploy, good DX, auto-scaling | Smaller community | ~$5-20/mo |
+| **Render** | Simple, free tier available, good for startups | Cold starts on free tier | Free-$25/mo |
+| **Fly.io** | Fast global deployment, generous free tier | Learning curve | Free-$20/mo |
+| **Google Cloud Run** | GCS integration (already using), auto-scale to zero | GCP complexity | Pay-per-use |
+| **DigitalOcean App Platform** | Simple, predictable pricing | Less features | $5-25/mo |
+| **AWS Lambda + API Gateway** | Scales infinitely, pay-per-request | Complex setup, cold starts | Pay-per-use |
+
+**Recommendation:** Railway or Render for MVP simplicity. Cloud Run if wanting to stay in GCP ecosystem.
+
+### Then:
 5. Complete IAP integration (StoreKit)
 6. Polish UI/UX (loading states, error handling)
-7. Deploy backend to production (Cloud Run or Railway)
-8. TestFlight beta
+7. App Store submission
 
 ---
 
@@ -242,14 +254,64 @@ Caerus is "Tinder for Founders & Investors" - a mobile-first video pitch marketp
 - [x] Investors with subscription get unlimited views
 - [x] Founders limited to 5/day (no subscription yet)
 
-### 8.6 Mobile - Talent Screens 🔲 TODO
-- [ ] TalentDashboardScreen.tsx
-- [ ] TalentOnboardingScreen.tsx
-- [ ] RecordTalentPitchScreen.tsx
-- [ ] TalentQAScreen.tsx
-- [ ] TalentSwipeFeedScreen.tsx (for founders/investors)
-- [ ] Feed toggle (Startups | Talent)
-- [ ] RoleSelectScreen update for "I'm Talent" option
+### 8.6 Mobile - Talent Screens ✅ COMPLETE (Jan 7, 2026)
+- [x] TalentDashboardScreen.tsx (connected to API with loading states)
+- [x] TalentOnboardingScreen.tsx (5-step wizard)
+- [x] RecordTalentPitchScreen.tsx (with video upload to GCS)
+- [x] TalentQAScreen.tsx (message threads list)
+- [x] TalentThreadScreen.tsx (NEW - chat interface for conversations)
+- [x] TalentSwipeFeedScreen.tsx (for founders/investors, with API)
+- [x] TalentContactScreen.tsx (NEW - for initiating contact with talent)
+- [x] TalentPitchCard.tsx component
+- [x] Feed toggle (Startups | Talent) on SwipeFeedScreen
+- [x] "Browse Talent" button on FounderDashboardScreen
+- [x] Navigation updated with all talent screens
+- [x] RoleSelectScreen already supports "I'm Talent" option
+
+---
+
+## Phase 10: Admin Panel & Support System ✅ COMPLETE (Jan 7, 2026)
+
+### 10.1 Admin Web Panel (Next.js) ✅
+- [x] Next.js 14 App Router + Tailwind CSS
+- [x] Firebase Auth (shared with mobile, @caerus.app domain only)
+- [x] Dashboard with stats (users by role, pending approvals, open tickets)
+- [x] Founders list (search, view details)
+- [x] Investors list (search, view details)
+- [x] Talent list (filter by status, approve/reject actions)
+- [x] Support inbox (list all tickets)
+- [x] Ticket detail view (conversation thread, reply, resolve/reopen)
+
+### 10.2 Backend - Admin Endpoints ✅
+- [x] GET /admin/dashboard/stats
+- [x] GET /admin/users/founders
+- [x] GET /admin/users/investors
+- [x] GET /admin/users/talent (with status filter)
+- [x] GET /admin/support/tickets
+- [x] GET /admin/support/tickets/{id}
+- [x] POST /admin/support/tickets/{id}/reply
+- [x] POST /admin/support/tickets/{id}/resolve
+- [x] POST /admin/support/tickets/{id}/reopen
+
+### 10.3 In-App Support (Mobile) ✅
+- [x] SupportScreen.tsx (AI chat + contact form)
+- [x] "Help & Support" button on Profile screen
+- [x] Navigation configured for all user roles (Founder, Investor, Talent)
+
+### 10.4 Support Backend ✅
+- [x] SupportTicket model
+- [x] SupportMessage model (sender_type: user/admin/ai)
+- [x] POST /support/ai-chat (AI response without ticket)
+- [x] POST /support/tickets (create ticket with initial message)
+- [x] GET /support/tickets (user's own tickets)
+- [x] GET /support/tickets/{id} (ticket with messages)
+- [x] POST /support/tickets/{id}/messages (add message)
+
+### 10.5 AI Support (Claude Haiku) ✅
+- [x] Anthropic SDK integration (claude-3-haiku-20240307)
+- [x] Context-aware system prompt (Caerus features, FAQ)
+- [x] Returns `needs_human: true/false` for escalation
+- [x] Graceful fallback if API unavailable
 
 ---
 
@@ -369,7 +431,7 @@ backend/
         └── __init__.py
 ```
 
-### Mobile (25+ screen/component files)
+### Mobile (30+ screen/component files)
 ```
 mobile/src/
 ├── context/
@@ -378,6 +440,7 @@ mobile/src/
 │   └── AppNavigator.tsx
 ├── components/
 │   ├── PitchCard.tsx
+│   ├── TalentPitchCard.tsx (NEW)
 │   ├── SwipeOverlay.tsx
 │   ├── QAMeModal.tsx
 │   └── OnboardingStep.tsx
@@ -388,25 +451,59 @@ mobile/src/
 │   │   └── RoleSelectScreen.tsx
 │   ├── onboarding/
 │   │   ├── InvestorOnboardingScreen.tsx
-│   │   └── FounderOnboardingScreen.tsx
+│   │   ├── FounderOnboardingScreen.tsx
+│   │   └── TalentOnboardingScreen.tsx (NEW)
 │   ├── founder/
-│   │   ├── FounderDashboardScreen.tsx
+│   │   ├── FounderDashboardScreen.tsx (updated with Browse Talent)
 │   │   ├── CreatePitchScreen.tsx
 │   │   ├── RecordVideoScreen.tsx
 │   │   └── FounderQAScreen.tsx
 │   ├── investor/
-│   │   ├── SwipeFeedScreen.tsx
+│   │   ├── SwipeFeedScreen.tsx (updated with feed toggle)
+│   │   ├── TalentSwipeFeedScreen.tsx (NEW)
+│   │   ├── TalentContactScreen.tsx (NEW)
 │   │   ├── PitchDetailScreen.tsx
 │   │   ├── InvestorQAScreen.tsx
 │   │   ├── SubscriptionScreen.tsx
 │   │   └── QuestionTemplatesScreen.tsx
+│   ├── talent/ (NEW directory)
+│   │   ├── TalentDashboardScreen.tsx
+│   │   ├── RecordTalentPitchScreen.tsx
+│   │   ├── TalentQAScreen.tsx
+│   │   └── TalentThreadScreen.tsx
 │   └── shared/
 │       ├── ProfileScreen.tsx
 │       └── SettingsScreen.tsx
 ├── services/
-│   └── api.ts
+│   └── api.ts (includes talent APIs)
 └── utils/
     └── constants.ts
+```
+
+### Admin Panel (New - Jan 7, 2026)
+```
+admin/
+├── app/
+│   ├── layout.tsx
+│   ├── page.tsx              # Dashboard
+│   ├── login/page.tsx
+│   ├── users/
+│   │   ├── founders/page.tsx
+│   │   ├── investors/page.tsx
+│   │   └── talent/page.tsx
+│   └── support/
+│       ├── page.tsx          # Inbox list
+│       └── [id]/page.tsx     # Ticket thread
+├── components/
+│   ├── AdminLayout.tsx
+│   └── Sidebar.tsx
+├── lib/
+│   ├── firebase.ts
+│   ├── auth-context.tsx
+│   └── api.ts
+├── package.json
+├── tailwind.config.ts
+└── next.config.js
 ```
 
 ### Infrastructure
@@ -426,10 +523,12 @@ PROGRESS.md (this file)
 |-----------|------------|-------|
 | Mobile | React Native + Expo | TypeScript, iOS-first |
 | Backend | FastAPI (Python 3.13) | SQLAlchemy ORM, Alembic migrations |
+| Admin Panel | Next.js 14 + Tailwind | App Router, Vercel hosting |
 | Database | PostgreSQL | Supabase (pooler connection) |
 | Auth | Firebase Auth | Email + Apple Sign-In |
 | Storage | Google Cloud Storage | `caerus-pitch-videos` bucket (R&D project) |
-| Video | expo-camera + expo-av | Record + playback |
+| Video | expo-camera + expo-video | Record + playback |
+| AI Support | Claude Haiku | Anthropic API for in-app support |
 | Payments | StoreKit (IAP) | Subscriptions + unlocks |
 
 ---
@@ -449,10 +548,20 @@ cd mobile
 npm install
 npx expo start
 
+# Start admin panel (local dev)
+cd admin
+npm install
+npm run dev
+# Opens at http://localhost:3000
+
 # Run database migrations (if schema changes)
 cd backend
 ./venv/bin/alembic revision --autogenerate -m "description"
 ./venv/bin/alembic upgrade head
+
+# Deploy admin to Vercel
+cd admin
+npx vercel
 ```
 
 ---
@@ -463,10 +572,12 @@ cd backend
 |---------|---------|
 | **Backend API** | http://localhost:8000 |
 | **API Docs** | http://localhost:8000/docs |
+| **Admin Panel** | http://localhost:3000 (dev) / TBD (Vercel) |
 | **Firebase Project** | `caerus-c29c9` |
 | **Supabase DB** | `aws-1-eu-west-1.pooler.supabase.com` |
 | **GCS Bucket** | `gs://caerus-pitch-videos` |
 | **GCP Project** | `prj-rnd-4297` (R&D with credits) |
+| **AI Support** | Claude Haiku via Anthropic API |
 
 ---
 
@@ -478,3 +589,27 @@ cd backend
 - **Free views:** Each investor gets 15 lifetime free views, then must subscribe
 - **Onboarding:** Users must complete onboarding wizard before accessing main app
 - **Service Account:** Firebase service account (`firebase-service-account.json`) is used for both Firebase Auth and GCS signing
+
+### Environment Variables Required
+
+**Backend (.env):**
+```
+DATABASE_URL=postgresql://...
+FIREBASE_PROJECT_ID=caerus-c29c9
+GOOGLE_APPLICATION_CREDENTIALS=/path/to/firebase-service-account.json
+ANTHROPIC_API_KEY=sk-ant-...
+JWT_SECRET=...
+APPLE_SHARED_SECRET=...
+```
+
+**Admin (.env.local):**
+```
+NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
+NEXT_PUBLIC_FIREBASE_API_KEY=...
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=...
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=caerus-c29c9
+```
+
+### Deprecation Warnings - RESOLVED (Jan 7, 2026)
+- ~~`expo-av` is deprecated in SDK 54~~ - Migrated to `expo-video` package
+- ~~`SafeAreaView` from react-native is deprecated~~ - Migrated to `react-native-safe-area-context`

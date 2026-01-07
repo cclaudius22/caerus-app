@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     # Apple IAP
     APPLE_SHARED_SECRET: str = ""
 
+    # Anthropic AI (for support chat)
+    ANTHROPIC_API_KEY: str = ""
+
     # JWT
     JWT_SECRET: str = "your-secret-key-change-in-production"
     JWT_ALGORITHM: str = "HS256"

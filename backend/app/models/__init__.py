@@ -6,6 +6,7 @@ from app.models.subscription import Subscription, PitchUnlock
 from app.models.question_template import QuestionTemplate
 from app.models.talent_pitch import TalentPitch, TalentPitchView
 from app.models.talent_qa import TalentQAThread, TalentQAMessage
+from app.models.support import SupportTicket, SupportMessage
 
 __all__ = [
     "User",
@@ -24,4 +25,6 @@ __all__ = [
     "TalentPitchView",
     "TalentQAThread",
     "TalentQAMessage",
+    "SupportTicket",
+    "SupportMessage",
 ]

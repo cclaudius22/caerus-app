@@ -17,17 +17,51 @@ A two-sided video pitch marketplace where founders upload short pitch videos and
 dealflow-app/
 ├── mobile/           # Expo React Native app
 ├── backend/          # FastAPI Python backend
+├── admin/            # Next.js admin panel
 └── infrastructure/   # Docker Compose, deployment configs
 ```
 
-## Getting Started
+## Quick Start
+
+### 1. Start Backend
+```bash
+cd backend
+source venv/bin/activate
+./venv/bin/uvicorn main:app --reload --host 0.0.0.0
+```
+Backend runs at: http://localhost:8000
+
+### 2. Start Mobile App
+```bash
+cd mobile
+npx expo start
+```
+
+Then:
+- **iOS Simulator**: Press `i`
+- **Physical iPhone**: Scan QR code with Camera app (opens in Expo Go)
+- **Clear cache**: `npx expo start --clear`
+
+> **Note**: Video recording only works on physical devices, not simulators.
+
+### 3. Start Admin Panel (optional)
+```bash
+cd admin
+npm install
+npm run dev
+```
+Admin panel runs at: http://localhost:3001
+
+---
+
+## Full Setup Guide
 
 ### Prerequisites
 
 - Node.js 18+
 - Python 3.11+
 - Docker Desktop
-- Expo Go app (for mobile testing)
+- Expo Go app (for mobile testing on physical device)
 
 ### Backend Setup
 
@@ -40,7 +74,7 @@ docker-compose up -d
 2. Set up Python environment:
 ```bash
 cd backend
-python -m venv venv
+python3 -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
@@ -53,12 +87,12 @@ cp .env.example .env
 
 4. Run migrations:
 ```bash
-alembic upgrade head
+./venv/bin/alembic upgrade head
 ```
 
 5. Start the backend:
 ```bash
-uvicorn main:app --reload
+./venv/bin/uvicorn main:app --reload --host 0.0.0.0
 ```
 
 The API will be available at http://localhost:8000
@@ -71,12 +105,45 @@ cd mobile
 npm install
 ```
 
-2. Start the Expo development server:
+2. Configure API URL (for physical device testing):
+```bash
+# Get your Mac's local IP
+ipconfig getifaddr en0
+
+# Update mobile/.env or src/utils/constants.ts with your IP
+# e.g., EXPO_PUBLIC_BASE_URL=http://192.168.0.123:8000
+```
+
+3. Start the Expo development server:
 ```bash
 npx expo start
 ```
 
-3. Scan the QR code with Expo Go (iOS/Android) or press `i` for iOS simulator
+4. Run the app:
+   - **iOS Simulator**: Press `i`
+   - **Android Emulator**: Press `a`
+   - **Physical Device**: Scan QR code with Camera app
+
+### Testing on Physical iPhone
+
+1. Install **Expo Go** from the App Store
+2. Ensure iPhone and Mac are on the **same WiFi network**
+3. Run `npx expo start` in the mobile directory
+4. Scan the QR code with iPhone Camera
+5. App opens in Expo Go
+
+### Common Commands
+
+| Command | Description |
+|---------|-------------|
+| `npx expo start` | Start Expo dev server |
+| `npx expo start --clear` | Start with cleared cache |
+| `npx expo start --ios` | Start and open iOS simulator |
+| `npx kill-port 8081` | Kill stuck Expo process |
+| `./venv/bin/uvicorn main:app --reload` | Start backend |
+| `./venv/bin/pytest tests/ -v` | Run backend tests |
+| `./venv/bin/alembic upgrade head` | Run migrations |
+| `cd admin && npm run dev` | Start admin panel |
 
 ## Cloud Services Setup
 

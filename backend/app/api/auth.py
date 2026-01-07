@@ -1,6 +1,9 @@
+import os
+import uuid
+import shutil
 from datetime import datetime, timedelta
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr
 from jose import jwt
@@ -10,6 +13,10 @@ from app.config import settings
 from app.models.user import User, FounderProfile, InvestorProfile, TalentProfile
 from app.api.deps import get_current_user
 from app.services.firebase import verify_firebase_token
+
+# Ensure uploads directory exists
+UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "uploads", "avatars")
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 router = APIRouter()
 
@@ -74,7 +81,7 @@ class FounderOnboardingRequest(BaseModel):
 
 
 class TalentOnboardingRequest(BaseModel):
-    full_name: str
+    full_name: Optional[str] = None
     job_title_seeking: str
     skills: list[str]
     experience_level: str  # junior, mid, senior, lead, executive
@@ -87,6 +94,14 @@ class TalentOnboardingRequest(BaseModel):
     linkedin_url: Optional[str] = None
     github_url: Optional[str] = None
     portfolio_url: Optional[str] = None
+
+
+class ProfileCompletionRequest(BaseModel):
+    full_name: str
+    company_name: str  # firm_name for investors, company_name for founders
+    linkedin_url: Optional[str] = None
+    twitter_url: Optional[str] = None
+    website: Optional[str] = None
 
 
 def create_access_token(user_id: str) -> str:
@@ -200,6 +215,7 @@ async def get_me(current_user: User = Depends(get_current_user), db: Session = D
     """Get current user info with profile."""
     profile = None
     onboarding_completed = False
+    profile_completed = False
 
     if current_user.role == "founder":
         founder_profile = db.query(FounderProfile).filter(
@@ -207,9 +223,14 @@ async def get_me(current_user: User = Depends(get_current_user), db: Session = D
         ).first()
         if founder_profile:
             onboarding_completed = founder_profile.onboarding_completed or False
+            profile_completed = founder_profile.profile_completed or False
             profile = {
                 "full_name": founder_profile.full_name,
+                "company_name": founder_profile.company_name,
                 "linkedin_url": founder_profile.linkedin_url,
+                "twitter_url": founder_profile.twitter_url,
+                "website": founder_profile.website,
+                "profile_completed": profile_completed,
                 "onboarding_completed": onboarding_completed,
                 "seeking_investor_types": founder_profile.seeking_investor_types,
                 "desired_check_size_min": founder_profile.desired_check_size_min,
@@ -222,11 +243,14 @@ async def get_me(current_user: User = Depends(get_current_user), db: Session = D
         ).first()
         if investor_profile:
             onboarding_completed = investor_profile.onboarding_completed or False
+            profile_completed = investor_profile.profile_completed or False
             profile = {
                 "full_name": investor_profile.full_name,
                 "firm_name": investor_profile.firm_name,
                 "linkedin_url": investor_profile.linkedin_url,
+                "twitter_url": investor_profile.twitter_url,
                 "website": investor_profile.website,
+                "profile_completed": profile_completed,
                 "onboarding_completed": onboarding_completed,
                 "investor_type": investor_profile.investor_type,
                 "ticket_size_min": investor_profile.ticket_size_min,
@@ -243,8 +267,13 @@ async def get_me(current_user: User = Depends(get_current_user), db: Session = D
         ).first()
         if talent_profile:
             onboarding_completed = talent_profile.onboarding_completed or False
+            profile_completed = talent_profile.profile_completed or False
             profile = {
                 "full_name": talent_profile.full_name,
+                "linkedin_url": talent_profile.linkedin_url,
+                "twitter_url": talent_profile.twitter_url,
+                "website": talent_profile.website,
+                "profile_completed": profile_completed,
                 "status": talent_profile.status,  # pending, approved, rejected
                 "applied_at": talent_profile.applied_at,
                 "approved_at": talent_profile.approved_at,
@@ -259,7 +288,6 @@ async def get_me(current_user: User = Depends(get_current_user), db: Session = D
                 "availability": talent_profile.availability,
                 "location": talent_profile.location,
                 "remote_preference": talent_profile.remote_preference,
-                "linkedin_url": talent_profile.linkedin_url,
                 "github_url": talent_profile.github_url,
                 "portfolio_url": talent_profile.portfolio_url,
             }
@@ -271,8 +299,10 @@ async def get_me(current_user: User = Depends(get_current_user), db: Session = D
             role=current_user.role,
             created_at=current_user.created_at
         ),
+        "avatar_url": current_user.avatar_url,
         "profile": profile,
-        "onboarding_completed": onboarding_completed
+        "onboarding_completed": onboarding_completed,
+        "profile_completed": profile_completed
     }
 
 
@@ -429,7 +459,8 @@ async def complete_talent_onboarding(
         )
 
     # Update profile info
-    profile.full_name = request.full_name
+    if request.full_name:
+        profile.full_name = request.full_name
     profile.job_title_seeking = request.job_title_seeking
     profile.skills = request.skills
     profile.experience_level = request.experience_level
@@ -463,3 +494,202 @@ async def complete_talent_onboarding(
             "onboarding_completed": profile.onboarding_completed
         }
     }
+
+
+@router.post("/profile/complete")
+async def complete_profile(
+    request: ProfileCompletionRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Complete user profile with professional details. Requires at least one social link."""
+    # Validate at least one social link is provided
+    has_social_link = any([
+        request.linkedin_url,
+        request.twitter_url,
+        request.website
+    ])
+    if not has_social_link:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="At least one social link (LinkedIn, Twitter, or Website) is required to build trust in our community."
+        )
+
+    # Validate full_name and company_name
+    if len(request.full_name.strip()) < 2:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Full name must be at least 2 characters."
+        )
+    if len(request.company_name.strip()) < 2:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Company/Organization name must be at least 2 characters."
+        )
+
+    if current_user.role == "founder":
+        profile = db.query(FounderProfile).filter(
+            FounderProfile.user_id == current_user.id
+        ).first()
+        if profile:
+            profile.full_name = request.full_name.strip()
+            profile.company_name = request.company_name.strip()
+            profile.linkedin_url = request.linkedin_url
+            profile.twitter_url = request.twitter_url
+            profile.website = request.website
+            profile.profile_completed = True
+
+    elif current_user.role == "investor":
+        profile = db.query(InvestorProfile).filter(
+            InvestorProfile.user_id == current_user.id
+        ).first()
+        if profile:
+            profile.full_name = request.full_name.strip()
+            profile.firm_name = request.company_name.strip()  # Use firm_name for investors
+            profile.linkedin_url = request.linkedin_url
+            profile.twitter_url = request.twitter_url
+            profile.website = request.website
+            profile.profile_completed = True
+
+    else:  # talent
+        profile = db.query(TalentProfile).filter(
+            TalentProfile.user_id == current_user.id
+        ).first()
+        if profile:
+            profile.full_name = request.full_name.strip()
+            # Talent doesn't have company_name, but we store it somewhere or skip
+            profile.linkedin_url = request.linkedin_url
+            profile.twitter_url = request.twitter_url
+            profile.website = request.website
+            profile.profile_completed = True
+
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Profile not found"
+        )
+
+    db.commit()
+    db.refresh(profile)
+
+    return {
+        "message": "Profile completed successfully. Welcome to our trusted community!",
+        "profile_completed": True
+    }
+
+
+@router.post("/avatar")
+async def upload_avatar(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Upload or replace user avatar photo. Only one photo at a time."""
+    # Validate file type
+    allowed_types = ["image/jpeg", "image/png", "image/webp"]
+    if file.content_type not in allowed_types:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only JPEG, PNG, and WebP images are allowed."
+        )
+
+    # Validate file size (max 5MB)
+    MAX_SIZE = 5 * 1024 * 1024  # 5MB
+    content = await file.read()
+    if len(content) > MAX_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Image size must be less than 5MB."
+        )
+
+    # Delete old avatar if exists
+    if current_user.avatar_url:
+        old_filename = current_user.avatar_url.split("/")[-1]
+        old_path = os.path.join(UPLOAD_DIR, old_filename)
+        if os.path.exists(old_path):
+            os.remove(old_path)
+
+    # Generate unique filename
+    ext = file.filename.split(".")[-1] if "." in file.filename else "jpg"
+    filename = f"{current_user.id}_{uuid.uuid4().hex[:8]}.{ext}"
+    filepath = os.path.join(UPLOAD_DIR, filename)
+
+    # Save file
+    with open(filepath, "wb") as f:
+        f.write(content)
+
+    # Update user avatar_url
+    avatar_url = f"/uploads/avatars/{filename}"
+    current_user.avatar_url = avatar_url
+    db.commit()
+
+    return {
+        "message": "Avatar uploaded successfully",
+        "avatar_url": avatar_url
+    }
+
+
+@router.delete("/avatar")
+async def delete_avatar(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Delete user avatar photo."""
+    if not current_user.avatar_url:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No avatar to delete."
+        )
+
+    # Delete file
+    filename = current_user.avatar_url.split("/")[-1]
+    filepath = os.path.join(UPLOAD_DIR, filename)
+    if os.path.exists(filepath):
+        os.remove(filepath)
+
+    # Clear avatar_url
+    current_user.avatar_url = None
+    db.commit()
+
+    return {"message": "Avatar deleted successfully"}
+
+
+@router.delete("/profile")
+async def delete_profile(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Delete user profile and associated data. Currently only supported for talent users."""
+    if current_user.role != "talent":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Profile deletion is currently only available for talent users."
+        )
+
+    # Delete talent profile
+    talent_profile = db.query(TalentProfile).filter(
+        TalentProfile.user_id == current_user.id
+    ).first()
+
+    if talent_profile:
+        # Delete any associated talent pitches
+        from app.models import TalentPitch
+        db.query(TalentPitch).filter(
+            TalentPitch.user_id == current_user.id
+        ).delete()
+
+        # Delete the talent profile
+        db.delete(talent_profile)
+
+    # Delete avatar if exists
+    if current_user.avatar_url:
+        filename = current_user.avatar_url.split("/")[-1]
+        filepath = os.path.join(UPLOAD_DIR, filename)
+        if os.path.exists(filepath):
+            os.remove(filepath)
+
+    # Delete the user
+    db.delete(current_user)
+    db.commit()
+
+    return {"message": "Profile deleted successfully"}

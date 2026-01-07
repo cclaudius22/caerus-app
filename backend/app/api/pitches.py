@@ -144,6 +144,17 @@ async def publish_pitch(
             detail="Pitch not found"
         )
 
+    # Auto-archive any existing published pitches of the same type for this startup
+    existing_published = db.query(Pitch).filter(
+        Pitch.startup_id == pitch.startup_id,
+        Pitch.type == pitch.type,
+        Pitch.status == "published",
+        Pitch.id != pitch.id
+    ).all()
+
+    for existing in existing_published:
+        existing.status = "archived"
+
     pitch.status = "published"
     pitch.duration_seconds = request.duration_seconds
     db.commit()
