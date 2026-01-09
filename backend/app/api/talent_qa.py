@@ -8,7 +8,13 @@ from app.database import get_db
 from app.models.user import User, TalentProfile
 from app.models.talent_pitch import TalentPitch
 from app.models.talent_qa import TalentQAThread, TalentQAMessage
-from app.api.deps import get_current_user, get_current_talent, get_talent_viewer_access, TalentViewAccess
+from app.api.deps import (
+    get_current_user,
+    get_current_talent,
+    get_talent_dm_access,
+    TalentDMAccess,
+    increment_talent_dm_count
+)
 
 router = APIRouter()
 
@@ -48,10 +54,22 @@ class ThreadResponse(BaseModel):
     created_at: datetime
 
 
+@router.get("/dm-access")
+async def get_dm_access(
+    dm_access: TalentDMAccess = Depends(get_talent_dm_access)
+):
+    """Get DM access information for the current user."""
+    return {
+        "dms_remaining": dm_access.dms_remaining_this_month,
+        "has_subscription": dm_access.has_subscription,
+        "can_send_dm": dm_access.can_send_dm
+    }
+
+
 @router.post("/threads")
 async def create_thread(
     request: CreateThreadRequest,
-    access: TalentViewAccess = Depends(get_talent_viewer_access),
+    dm_access: TalentDMAccess = Depends(get_talent_dm_access),
     db: Session = Depends(get_db)
 ):
     """Create a new Q&A thread with a talent (recruiter initiates)."""
@@ -73,14 +91,14 @@ async def create_thread(
     # Check if thread already exists
     existing_thread = db.query(TalentQAThread).filter(
         TalentQAThread.pitch_id == pitch.id,
-        TalentQAThread.recruiter_id == access.user.id
+        TalentQAThread.recruiter_id == dm_access.user.id
     ).first()
 
     if existing_thread:
-        # Add message to existing thread
+        # Add message to existing thread (no DM limit for replies)
         message = TalentQAMessage(
             thread_id=existing_thread.id,
-            sender_id=access.user.id,
+            sender_id=dm_access.user.id,
             content=request.initial_message,
             message_type="text"
         )
@@ -89,13 +107,22 @@ async def create_thread(
 
         return {
             "thread_id": str(existing_thread.id),
-            "message": "Message added to existing thread"
+            "message": "Message added to existing thread",
+            "dms_remaining": dm_access.dms_remaining_this_month
         }
+
+    # Check DM allowance for NEW threads only
+    if not dm_access.can_send_dm:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail="Monthly DM limit reached. Upgrade to continue messaging talent.",
+            headers={"X-DMs-Remaining": "0"}
+        )
 
     # Create new thread
     thread = TalentQAThread(
         pitch_id=pitch.id,
-        recruiter_id=access.user.id,
+        recruiter_id=dm_access.user.id,
         talent_id=pitch.talent_id
     )
     db.add(thread)
@@ -105,16 +132,24 @@ async def create_thread(
     # Add initial message
     message = TalentQAMessage(
         thread_id=thread.id,
-        sender_id=access.user.id,
+        sender_id=dm_access.user.id,
         content=request.initial_message,
         message_type="text"
     )
     db.add(message)
+
+    # Increment DM count (only for NEW threads)
+    increment_talent_dm_count(dm_access.user, db)
+
     db.commit()
+
+    # Calculate remaining DMs after this one
+    dms_remaining = dm_access.dms_remaining_this_month - 1 if not dm_access.has_subscription else dm_access.dms_remaining_this_month
 
     return {
         "thread_id": str(thread.id),
-        "message": "Thread created successfully"
+        "message": "Thread created successfully",
+        "dms_remaining": dms_remaining
     }
 
 

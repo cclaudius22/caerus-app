@@ -1,10 +1,17 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, DateTime, ForeignKey, Boolean, Text
+from sqlalchemy import Column, String, DateTime, ForeignKey, Boolean, Text, Enum
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
+import enum
 
 from app.database import Base
+
+
+class ThreadStatus(str, enum.Enum):
+    active = "active"           # Q&A in progress
+    interested = "interested"   # Investor wants to connect
+    declined = "declined"       # Investor passed politely
 
 
 class QAThread(Base):
@@ -14,6 +21,8 @@ class QAThread(Base):
     pitch_id = Column(UUID(as_uuid=True), ForeignKey("pitches.id", ondelete="CASCADE"), nullable=False)
     investor_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     startup_id = Column(UUID(as_uuid=True), ForeignKey("startups.id", ondelete="CASCADE"), nullable=False)
+    status = Column(String(20), default=ThreadStatus.active.value)
+    decline_message = Column(Text, nullable=True)  # Optional message when declining
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

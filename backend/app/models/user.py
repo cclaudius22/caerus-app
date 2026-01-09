@@ -15,6 +15,7 @@ class User(Base):
     email = Column(String(255), unique=True, nullable=False)
     role = Column(String(20), nullable=False)  # 'founder', 'investor', or 'talent'
     avatar_url = Column(String(500), nullable=True)  # Profile photo URL
+    push_token = Column(String(255), nullable=True)  # Expo push notification token
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -49,6 +50,11 @@ class FounderProfile(Base):
     # Talent view tracking (5/day limit)
     talent_views_today = Column(Integer, default=0)
     talent_views_reset_date = Column(Date, nullable=True)
+
+    # Talent DM tracking (5/month limit)
+    talent_dms_this_month = Column(Integer, default=0)
+    talent_dms_reset_month = Column(Integer, nullable=True)  # Month number (1-12)
+    talent_dms_reset_year = Column(Integer, nullable=True)
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -86,6 +92,11 @@ class InvestorProfile(Base):
     # Talent view tracking (5/day limit)
     talent_views_today = Column(Integer, default=0)
     talent_views_reset_date = Column(Date, nullable=True)
+
+    # Talent DM tracking (5/month limit)
+    talent_dms_this_month = Column(Integer, default=0)
+    talent_dms_reset_month = Column(Integer, nullable=True)  # Month number (1-12)
+    talent_dms_reset_year = Column(Integer, nullable=True)
 
     is_verified = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)

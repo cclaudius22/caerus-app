@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
-from app.api import auth, startups, pitches, qa, subscriptions, question_templates, admin, talent_pitches, talent_qa, support
+from app.api import auth, startups, pitches, qa, subscriptions, question_templates, admin, talent_pitches, talent_qa, support, profiles
 
 # Ensure uploads directory exists
 UPLOADS_DIR = os.path.join(os.path.dirname(__file__), "uploads")
@@ -36,6 +36,7 @@ app.include_router(admin.router, prefix="/api/v1/admin", tags=["Admin"])
 app.include_router(talent_pitches.router, prefix="/api/v1/talent-pitches", tags=["Talent Pitches"])
 app.include_router(talent_qa.router, prefix="/api/v1/talent-qa", tags=["Talent Q&A"])
 app.include_router(support.router, prefix="/api/v1/support", tags=["Support"])
+app.include_router(profiles.router, prefix="/api/v1/profiles", tags=["Profiles"])
 
 # Mount static files for serving uploaded files (avatars, etc.)
 app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")

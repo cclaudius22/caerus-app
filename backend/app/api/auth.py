@@ -693,3 +693,40 @@ async def delete_profile(
     db.commit()
 
     return {"message": "Profile deleted successfully"}
+
+
+class PushTokenRequest(BaseModel):
+    push_token: str  # Expo push token (ExponentPushToken[...])
+
+
+@router.post("/push-token")
+async def register_push_token(
+    request: PushTokenRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Register or update the user's push notification token."""
+    # Validate token format
+    if not request.push_token.startswith("ExponentPushToken["):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid push token format. Expected ExponentPushToken[...]"
+        )
+
+    # Update user's push token
+    current_user.push_token = request.push_token
+    db.commit()
+
+    return {"message": "Push token registered successfully"}
+
+
+@router.delete("/push-token")
+async def unregister_push_token(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Remove the user's push notification token (e.g., on logout)."""
+    current_user.push_token = None
+    db.commit()
+
+    return {"message": "Push token removed successfully"}

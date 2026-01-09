@@ -241,3 +241,96 @@ async def get_talent_viewer_access(
         has_subscription=has_subscription,
         talent_views_remaining_today=talent_views_remaining
     )
+
+
+class TalentDMAccess:
+    """Holds talent DM access information for founders/investors (5/month limit)."""
+    def __init__(self, user: User, has_subscription: bool, dms_remaining_this_month: int):
+        self.user = user
+        self.has_subscription = has_subscription
+        self.dms_remaining_this_month = dms_remaining_this_month
+
+    @property
+    def can_send_dm(self) -> bool:
+        return self.has_subscription or self.dms_remaining_this_month > 0
+
+
+async def get_talent_dm_access(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+) -> TalentDMAccess:
+    """Get DM access for founders/investors messaging talent (5/month limit)."""
+    if current_user.role not in ["founder", "investor"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only founders and investors can message talent"
+        )
+
+    has_subscription = False
+    dms_remaining = 5  # Default monthly limit
+    current_month = date.today().month
+    current_year = date.today().year
+
+    if current_user.role == "investor":
+        # Check investor subscription
+        from app.models.subscription import Subscription
+        from datetime import datetime
+
+        subscription = db.query(Subscription).filter(
+            Subscription.investor_id == current_user.id,
+            Subscription.status == "active",
+            Subscription.expires_at > datetime.utcnow()
+        ).first()
+        has_subscription = subscription is not None
+
+        # Get investor profile for talent DMs
+        profile = db.query(InvestorProfile).filter(
+            InvestorProfile.user_id == current_user.id
+        ).first()
+
+        if profile:
+            # Reset if new month
+            if profile.talent_dms_reset_month != current_month or profile.talent_dms_reset_year != current_year:
+                profile.talent_dms_this_month = 0
+                profile.talent_dms_reset_month = current_month
+                profile.talent_dms_reset_year = current_year
+                db.commit()
+            dms_remaining = 5 - (profile.talent_dms_this_month or 0)
+
+    else:  # founder
+        # Founders can have their own subscription for talent DMs
+        # For now, no subscription model for founders, just free tier
+        profile = db.query(FounderProfile).filter(
+            FounderProfile.user_id == current_user.id
+        ).first()
+
+        if profile:
+            # Reset if new month
+            if profile.talent_dms_reset_month != current_month or profile.talent_dms_reset_year != current_year:
+                profile.talent_dms_this_month = 0
+                profile.talent_dms_reset_month = current_month
+                profile.talent_dms_reset_year = current_year
+                db.commit()
+            dms_remaining = 5 - (profile.talent_dms_this_month or 0)
+
+    return TalentDMAccess(
+        user=current_user,
+        has_subscription=has_subscription,
+        dms_remaining_this_month=dms_remaining
+    )
+
+
+def increment_talent_dm_count(user: User, db: Session) -> None:
+    """Increment the talent DM count for a user after sending a DM."""
+    if user.role == "investor":
+        profile = db.query(InvestorProfile).filter(
+            InvestorProfile.user_id == user.id
+        ).first()
+    else:  # founder
+        profile = db.query(FounderProfile).filter(
+            FounderProfile.user_id == user.id
+        ).first()
+
+    if profile:
+        profile.talent_dms_this_month = (profile.talent_dms_this_month or 0) + 1
+        db.commit()
