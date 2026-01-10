@@ -195,7 +195,7 @@ async def get_pitch_feed(
 
     # Apply filters
     if sector:
-        query = query.filter(Startup.sector == sector)
+        query = query.filter(Startup.sectors.any(sector))
     if stage:
         query = query.filter(Startup.stage == stage)
     if location:
@@ -215,7 +215,7 @@ async def get_pitch_feed(
                 "id": str(pitch.startup.id),
                 "name": pitch.startup.name,
                 "tagline": pitch.startup.tagline,
-                "sector": pitch.startup.sector,
+                "sectors": pitch.startup.sectors,
                 "stage": pitch.startup.stage,
                 "location": pitch.startup.location,
                 "logo_url": pitch.startup.logo_url
@@ -270,7 +270,7 @@ async def get_pitch_detail(
             "id": str(pitch.startup.id),
             "name": pitch.startup.name,
             "tagline": pitch.startup.tagline,
-            "sector": pitch.startup.sector,
+            "sectors": pitch.startup.sectors,
             "stage": pitch.startup.stage,
             "location": pitch.startup.location,
             "website": pitch.startup.website,
@@ -396,7 +396,7 @@ async def get_founder_dashboard(
         startup_data.append({
             "id": str(startup.id),
             "name": startup.name,
-            "sector": startup.sector,
+            "sectors": startup.sectors,
             "stage": startup.stage,
             "pitches": pitch_list
         })

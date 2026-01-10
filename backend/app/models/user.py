@@ -16,6 +16,8 @@ class User(Base):
     role = Column(String(20), nullable=False)  # 'founder', 'investor', or 'talent'
     avatar_url = Column(String(500), nullable=True)  # Profile photo URL
     push_token = Column(String(255), nullable=True)  # Expo push notification token
+    is_hidden = Column(Boolean, default=False)  # Hide profile from feeds/search
+    scheduled_deletion_date = Column(DateTime, nullable=True)  # 30-day grace period for deletion
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

@@ -17,7 +17,7 @@ class StartupCreate(BaseModel):
     name: str
     tagline: Optional[str] = None
     website: Optional[str] = None
-    sector: Optional[str] = None
+    sectors: Optional[List[str]] = None
     stage: Optional[str] = None  # 'idea', 'pre_seed', 'seed', 'series_a'
     location: Optional[str] = None
     round_size_min: Optional[int] = None
@@ -29,7 +29,7 @@ class StartupUpdate(BaseModel):
     name: Optional[str] = None
     tagline: Optional[str] = None
     website: Optional[str] = None
-    sector: Optional[str] = None
+    sectors: Optional[List[str]] = None
     stage: Optional[str] = None
     location: Optional[str] = None
     round_size_min: Optional[int] = None
@@ -43,7 +43,7 @@ class StartupResponse(BaseModel):
     name: str
     tagline: Optional[str]
     website: Optional[str]
-    sector: Optional[str]
+    sectors: Optional[List[str]]
     stage: Optional[str]
     location: Optional[str]
     round_size_min: Optional[int]
@@ -64,7 +64,7 @@ async def create_startup(
 ):
     """Create a new startup."""
     # Validate stage if provided
-    valid_stages = ["idea", "pre_seed", "seed", "series_a"]
+    valid_stages = ["idea", "angel", "pre_seed", "seed", "series_a", "series_b"]
     if startup_data.stage and startup_data.stage not in valid_stages:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -76,7 +76,7 @@ async def create_startup(
         name=startup_data.name,
         tagline=startup_data.tagline,
         website=startup_data.website,
-        sector=startup_data.sector,
+        sectors=startup_data.sectors,
         stage=startup_data.stage,
         location=startup_data.location,
         round_size_min=startup_data.round_size_min,
@@ -93,7 +93,7 @@ async def create_startup(
         name=startup.name,
         tagline=startup.tagline,
         website=startup.website,
-        sector=startup.sector,
+        sectors=startup.sectors,
         stage=startup.stage,
         location=startup.location,
         round_size_min=startup.round_size_min,
@@ -118,7 +118,7 @@ async def list_my_startups(
             name=s.name,
             tagline=s.tagline,
             website=s.website,
-            sector=s.sector,
+            sectors=s.sectors,
             stage=s.stage,
             location=s.location,
             round_size_min=s.round_size_min,
@@ -150,7 +150,7 @@ async def get_startup(
         name=startup.name,
         tagline=startup.tagline,
         website=startup.website,
-        sector=startup.sector,
+        sectors=startup.sectors,
         stage=startup.stage,
         location=startup.location,
         round_size_min=startup.round_size_min,
@@ -193,7 +193,7 @@ async def update_startup(
         name=startup.name,
         tagline=startup.tagline,
         website=startup.website,
-        sector=startup.sector,
+        sectors=startup.sectors,
         stage=startup.stage,
         location=startup.location,
         round_size_min=startup.round_size_min,

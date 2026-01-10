@@ -302,7 +302,9 @@ async def get_me(current_user: User = Depends(get_current_user), db: Session = D
         "avatar_url": current_user.avatar_url,
         "profile": profile,
         "onboarding_completed": onboarding_completed,
-        "profile_completed": profile_completed
+        "profile_completed": profile_completed,
+        "is_hidden": current_user.is_hidden or False,
+        "scheduled_deletion_date": current_user.scheduled_deletion_date.isoformat() if current_user.scheduled_deletion_date else None
     }
 
 
@@ -655,44 +657,59 @@ async def delete_avatar(
 
 
 @router.delete("/profile")
-async def delete_profile(
+async def schedule_profile_deletion(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Delete user profile and associated data. Currently only supported for talent users."""
-    if current_user.role != "talent":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Profile deletion is currently only available for talent users."
-        )
-
-    # Delete talent profile
-    talent_profile = db.query(TalentProfile).filter(
-        TalentProfile.user_id == current_user.id
-    ).first()
-
-    if talent_profile:
-        # Delete any associated talent pitches
-        from app.models import TalentPitch
-        db.query(TalentPitch).filter(
-            TalentPitch.user_id == current_user.id
-        ).delete()
-
-        # Delete the talent profile
-        db.delete(talent_profile)
-
-    # Delete avatar if exists
-    if current_user.avatar_url:
-        filename = current_user.avatar_url.split("/")[-1]
-        filepath = os.path.join(UPLOAD_DIR, filename)
-        if os.path.exists(filepath):
-            os.remove(filepath)
-
-    # Delete the user
-    db.delete(current_user)
+    """Schedule account deletion with 30-day grace period. Works for all user types."""
+    # Set scheduled deletion date to 30 days from now
+    deletion_date = datetime.utcnow() + timedelta(days=30)
+    current_user.scheduled_deletion_date = deletion_date
     db.commit()
 
-    return {"message": "Profile deleted successfully"}
+    return {
+        "message": "Your account will be permanently deleted in 30 days. You can cancel this anytime by logging back in.",
+        "scheduled_deletion_date": deletion_date.isoformat()
+    }
+
+
+class ProfileVisibilityRequest(BaseModel):
+    is_hidden: bool
+
+
+@router.put("/profile/visibility")
+async def update_profile_visibility(
+    request: ProfileVisibilityRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Update profile visibility. Hidden profiles don't appear in feeds/search."""
+    current_user.is_hidden = request.is_hidden
+    db.commit()
+
+    status_text = "hidden from" if request.is_hidden else "visible in"
+    return {
+        "message": f"Your profile is now {status_text} feeds and search.",
+        "is_hidden": current_user.is_hidden
+    }
+
+
+@router.post("/profile/cancel-deletion")
+async def cancel_profile_deletion(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Cancel scheduled account deletion."""
+    if not current_user.scheduled_deletion_date:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No pending deletion to cancel."
+        )
+
+    current_user.scheduled_deletion_date = None
+    db.commit()
+
+    return {"message": "Account deletion has been cancelled. Your account is safe."}
 
 
 class PushTokenRequest(BaseModel):

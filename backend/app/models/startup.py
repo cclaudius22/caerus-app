@@ -15,7 +15,7 @@ class Startup(Base):
     name = Column(String(255), nullable=False)
     tagline = Column(String(500))
     website = Column(String(500))
-    sector = Column(String(100))
+    sectors = Column(ARRAY(String))  # Can be multiple: SaaS, Fintech, etc.
     stage = Column(String(50))  # 'idea', 'pre_seed', 'seed', 'series_a'
     location = Column(String(255))
     round_size_min = Column(Integer)
